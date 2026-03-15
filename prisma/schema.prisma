@@ -1,0 +1,181 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // directUrl is needed when using Supabase connection pooler (pgBouncer)
+  // directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum OrderStatus {
+  new
+  paid
+  processing
+  shipped
+  delivered
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  cancelled
+}
+
+enum PaymentMethod {
+  NETOPIA
+}
+
+enum TransactionStatus {
+  pending
+  success
+  failed
+  cancelled
+}
+
+// ─────────────────────────────────────────────
+// MODELS
+// ─────────────────────────────────────────────
+
+model Admin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("admins")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products Product[]
+
+  @@index([slug])
+  @@map("categories")
+}
+
+model Product {
+  id                String   @id @default(cuid())
+  name              String
+  slug              String   @unique
+  shortDescription  String
+  fullDescription   String
+  price             Decimal  @db.Decimal(10, 2)
+  compareAtPrice    Decimal? @db.Decimal(10, 2)
+  mainImage         String
+  galleryImages     String[] @default([])
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  stock             Int     @default(0)
+  isActive          Boolean @default(true)
+
+  ingredients        String?
+  usageInstructions  String?
+  benefits           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orderItems OrderItem[]
+
+  @@index([slug])
+  @@index([categoryId])
+  @@index([isActive])
+  @@map("products")
+}
+
+model Order {
+  id          String @id @default(cuid())
+  orderNumber String @unique
+
+  customerFirstName String
+  customerLastName  String
+  email             String
+  phone             String
+
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  county       String
+  postalCode   String?
+  notes        String?
+
+  subtotal     Decimal @db.Decimal(10, 2)
+  shippingCost Decimal @db.Decimal(10, 2)
+  total        Decimal @db.Decimal(10, 2)
+
+  paymentMethod PaymentMethod
+  paymentStatus PaymentStatus @default(pending)
+  orderStatus   OrderStatus   @default(new)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items        OrderItem[]
+  transactions Transaction[]
+
+  @@index([orderNumber])
+  @@index([email])
+  @@index([paymentStatus])
+  @@index([orderStatus])
+  @@map("orders")
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  // Snapshots — preserve the historical record even if the product changes
+  productNameSnapshot  String
+  productPriceSnapshot Decimal @db.Decimal(10, 2)
+  quantity             Int
+  lineTotal            Decimal @db.Decimal(10, 2)
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model Transaction {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  provider              String
+  providerTransactionId String?
+
+  amount   Decimal @db.Decimal(10, 2)
+  currency String  @default("RON")
+
+  status      TransactionStatus @default(pending)
+  rawResponse Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([providerTransactionId])
+  @@map("transactions")
+}

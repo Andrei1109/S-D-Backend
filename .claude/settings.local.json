@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(mkdir -p \"d:/Proiecte/S-DBeautyHub/SD Backend ADMIN/app/api/categories/[slug]\")",
+      "Bash(mkdir -p \"d:/Proiecte/S-DBeautyHub/SD Backend ADMIN/app/api/admin/categories/[id]\")",
+      "Bash(npm run:*)"
+    ],
+    "additionalDirectories": [
+      "d:\\Proiecte\\S-DBeautyHub\\SD Backend ADMIN\\app\\api\\products",
+      "d:\\Proiecte\\S-DBeautyHub\\SD Backend ADMIN\\app\\api\\orders"
+    ]
+  }
+}
