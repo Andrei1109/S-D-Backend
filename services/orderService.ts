@@ -7,6 +7,7 @@
 
 import { prisma } from "@/lib/prisma";
 import type { UpdateOrderStatusInput } from "@/validators/orderValidator";
+import type { OrderStatus, PaymentStatus } from "@prisma/client";
 
 // ─────────────────────────────────────────────
 // Types
@@ -65,8 +66,8 @@ export async function getAllOrders(
   } : {};
 
   const where = {
-    ...(status ? { orderStatus: status } : {}),
-    ...(payment ? { paymentStatus: payment } : {}),
+    ...(status ? { orderStatus: status as OrderStatus } : {}),
+    ...(payment ? { paymentStatus: payment as PaymentStatus } : {}),
     ...searchCondition,
   };
 
