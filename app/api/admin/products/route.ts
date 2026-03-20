@@ -8,12 +8,19 @@
 import { type NextRequest } from "next/server";
 import { getAllProductsAdmin, createProduct } from "@/services/productService";
 import { createProductSchema } from "@/validators/productValidator";
-import { successResponse, errorResponse, ERRORS } from "@/utils/apiResponse";
+import { successResponse, paginatedResponse, errorResponse, ERRORS } from "@/utils/apiResponse";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const products = await getAllProductsAdmin();
-    return successResponse(products);
+    const sp = request.nextUrl.searchParams;
+    const page = Math.max(1, Number(sp.get("page")) || 1);
+    const limit = Math.min(100, Math.max(1, Number(sp.get("limit")) || 20));
+    const search = sp.get("search") ?? undefined;
+    const categorySlug = sp.get("category") ?? undefined;
+    const subcategorySlug = sp.get("subcategory") ?? undefined;
+
+    const result = await getAllProductsAdmin({ page, limit, search, categorySlug, subcategorySlug });
+    return paginatedResponse(result.data, result.pagination);
   } catch (err) {
     console.error("[GET /api/admin/products]", err);
     return errorResponse(ERRORS.INTERNAL, 500);

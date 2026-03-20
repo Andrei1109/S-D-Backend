@@ -8,6 +8,7 @@
 export type {
   Admin,
   Category,
+  Subcategory,
   Product,
   Order,
   OrderItem,
@@ -55,13 +56,18 @@ export interface NetopiaInitiateResult {
 }
 
 export interface NetopiaIpnPayload {
-  /** REST API v2 wraps everything under a "payment" key */
+  /** REST API v2 wraps payment data under "payment" key */
   payment?: {
     ntpID?: string;
     orderID?: string;
     status?: number | string;
     amount?: number | string;
     currency?: string;
+    [key: string]: unknown;
+  };
+  /** REST API v2 wraps order data under "order" key */
+  order?: {
+    orderID?: string;
     [key: string]: unknown;
   };
   /** Some gateway versions / form-encoded payloads use a flat structure */

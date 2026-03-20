@@ -7,9 +7,10 @@
 import { prisma } from "@/lib/prisma";
 import type { Category } from "@/types";
 
-export async function getAllCategories(): Promise<Category[]> {
+export async function getAllCategories() {
   return prisma.category.findMany({
     orderBy: { name: "asc" },
+    include: { subcategories: { orderBy: { name: "asc" } } },
   });
 }
 

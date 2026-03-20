@@ -91,16 +91,21 @@ export async function initiateNetopiaPayment(
     );
   }
 
-  // TODO:NETOPIA — Build the exact request body per Netopia REST API v2 docs.
-  // The structure below reflects the documented schema; verify field names
-  // against https://doc.netopia-payments.com/ before going live.
+  // Build redirect URLs with orderNumber so the return page knows which order to show
+  const baseReturnUrl = process.env.NETOPIA_RETURN_URL ?? "";
+  const returnUrl = `${baseReturnUrl}${baseReturnUrl.includes("?") ? "&" : "?"}orderNumber=${order.orderNumber}`;
+
+  // Cancel URL → redirect to frontend homepage
+  const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:3001";
+  const cancelUrl = process.env.NETOPIA_CANCEL_URL ?? frontendUrl;
+
   const requestBody = {
     config: {
-      emailTemplate: "",                              // TODO:NETOPIA — add your Netopia email template ID if any
+      emailTemplate: "",
       notifyUrl: process.env.NETOPIA_IPN_URL ?? "",
-      redirectUrl: process.env.NETOPIA_RETURN_URL ?? "",
+      redirectUrl: returnUrl,
       language: "ro",
-      cancelUrl: process.env.NETOPIA_CANCEL_URL ?? process.env.NETOPIA_RETURN_URL ?? "",
+      cancelUrl,
     },
     payment: {
       options: {
@@ -213,12 +218,17 @@ export async function handleNetopiaIpn(
   // Netopia may send a header you must validate to ensure the request is genuine.
   // Insert signature verification here before doing anything else.
 
-  // Netopia REST API v2 wraps fields under a nested "payment" object.
-  // Older / form-encoded versions use a flat structure — support both.
-  const p = rawPayload.payment ?? rawPayload;
-  const ntpID = (p.ntpID ?? rawPayload.ntpID) as string | undefined;
-  const orderID = (p.orderID ?? rawPayload.orderID) as string | undefined;
-  const status = Number(p.status ?? rawPayload.status ?? 0);
+  // Log the full IPN payload for debugging
+  console.log("[Netopia IPN] Full payload:", JSON.stringify(rawPayload, null, 2));
+
+  // Netopia REST API v2 sends: { order: { orderID }, payment: { ntpID, status, ... } }
+  const paymentData = rawPayload.payment ?? rawPayload;
+  const orderData = rawPayload.order ?? rawPayload;
+  const ntpID = (paymentData.ntpID ?? rawPayload.ntpID) as string | undefined;
+  const orderID = (orderData.orderID ?? paymentData.orderID ?? rawPayload.orderID) as string | undefined;
+  const status = Number(paymentData.status ?? rawPayload.status ?? 0);
+
+  console.log("[Netopia IPN] Parsed → ntpID:", ntpID, "orderID:", orderID, "status:", status);
 
   if (!ntpID || !orderID) {
     console.error("[Netopia IPN] Missing ntpID or orderID:", rawPayload);

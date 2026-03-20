@@ -14,6 +14,7 @@ const productBaseSchema = z.object({
   mainImage: z.string().url("Main image must be a valid URL."),
   galleryImages: z.array(z.string().url()).max(10).optional().default([]),
   categoryId: z.string().cuid("Invalid category ID."),
+  subcategoryId: z.string().cuid().optional().nullable(),
   stock: z.number().int().min(0, "Stock cannot be negative."),
   isActive: z.boolean().optional().default(true),
   ingredients: z.string().max(2000).optional().nullable(),

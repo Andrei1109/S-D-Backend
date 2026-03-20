@@ -8,6 +8,28 @@
 import { prisma } from "@/lib/prisma";
 import type { UpdateOrderStatusInput } from "@/validators/orderValidator";
 
+// ─────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────
+
+export interface OrderListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  payment?: string;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 const orderWithItems = {
   include: {
     items: {
@@ -24,14 +46,53 @@ const orderWithItems = {
 // Admin queries
 // ─────────────────────────────────────────────
 
-export async function getAllOrders() {
-  return prisma.order.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      items: { select: { quantity: true, lineTotal: true } },
-      _count: { select: { items: true } },
+export async function getAllOrders(
+  params: OrderListParams = {}
+): Promise<PaginatedResult<unknown>> {
+  const { page = 1, limit = 20, search, status, payment } = params;
+  const skip = (page - 1) * limit;
+
+  const searchWords = search?.trim().split(/\s+/).filter(Boolean) ?? [];
+  const searchCondition = searchWords.length > 0 ? {
+    AND: searchWords.map(word => ({
+      OR: [
+        { orderNumber: { contains: word, mode: 'insensitive' as const } },
+        { email: { contains: word, mode: 'insensitive' as const } },
+        { customerFirstName: { contains: word, mode: 'insensitive' as const } },
+        { customerLastName: { contains: word, mode: 'insensitive' as const } },
+      ],
+    })),
+  } : {};
+
+  const where = {
+    ...(status ? { orderStatus: status } : {}),
+    ...(payment ? { paymentStatus: payment } : {}),
+    ...searchCondition,
+  };
+
+  const [orders, total] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+      include: {
+        items: { select: { quantity: true, lineTotal: true } },
+        _count: { select: { items: true } },
+      },
+    }),
+    prisma.order.count({ where }),
+  ]);
+
+  return {
+    data: orders,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
     },
-  });
+  };
 }
 
 export async function getOrderById(id: string) {

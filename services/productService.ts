@@ -9,25 +9,80 @@ import { prisma } from "@/lib/prisma";
 import type { CreateProductInput, UpdateProductInput } from "@/validators/productValidator";
 import type { Product } from "@/types";
 
+// ─────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────
+
+export interface ProductListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  categorySlug?: string;
+  subcategorySlug?: string;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 const productWithCategory = {
-  include: { category: true },
+  include: { category: true, subcategory: true },
 } as const;
 
 // ─────────────────────────────────────────────
 // Public queries
 // ─────────────────────────────────────────────
 
-export async function getActiveProducts(categorySlug?: string) {
-  return prisma.product.findMany({
-    where: {
-      isActive: true,
-      ...(categorySlug
-        ? { category: { slug: categorySlug } }
-        : {}),
+export async function getActiveProducts(
+  params: ProductListParams = {}
+): Promise<PaginatedResult<Product>> {
+  const { page = 1, limit = 20, search, categorySlug, subcategorySlug } = params;
+  const skip = (page - 1) * limit;
+
+  const searchWords = search?.trim().split(/\s+/).filter(Boolean) ?? [];
+  const searchCondition = searchWords.length > 0 ? {
+    AND: searchWords.map(word => ({
+      OR: [
+        { name: { contains: word, mode: 'insensitive' as const } },
+        { shortDescription: { contains: word, mode: 'insensitive' as const } },
+        { fullDescription: { contains: word, mode: 'insensitive' as const } },
+      ],
+    })),
+  } : {};
+
+  const where = {
+    isActive: true,
+    ...(categorySlug ? { category: { slug: categorySlug } } : {}),
+    ...(subcategorySlug ? { subcategory: { slug: subcategorySlug } } : {}),
+    ...searchCondition,
+  };
+
+  const [products, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+      ...productWithCategory,
+    }),
+    prisma.product.count({ where }),
+  ]);
+
+  return {
+    data: products,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
     },
-    orderBy: { createdAt: "desc" },
-    ...productWithCategory,
-  });
+  };
 }
 
 export async function getProductBySlug(slug: string) {
@@ -41,11 +96,49 @@ export async function getProductBySlug(slug: string) {
 // Admin queries
 // ─────────────────────────────────────────────
 
-export async function getAllProductsAdmin() {
-  return prisma.product.findMany({
-    orderBy: { createdAt: "desc" },
-    ...productWithCategory,
-  });
+export async function getAllProductsAdmin(
+  params: ProductListParams = {}
+): Promise<PaginatedResult<Product>> {
+  const { page = 1, limit = 20, search, categorySlug, subcategorySlug } = params;
+  const skip = (page - 1) * limit;
+
+  const searchWords = search?.trim().split(/\s+/).filter(Boolean) ?? [];
+  const searchCondition = searchWords.length > 0 ? {
+    AND: searchWords.map(word => ({
+      OR: [
+        { name: { contains: word, mode: 'insensitive' as const } },
+        { shortDescription: { contains: word, mode: 'insensitive' as const } },
+        { fullDescription: { contains: word, mode: 'insensitive' as const } },
+      ],
+    })),
+  } : {};
+
+  const where = {
+    ...(categorySlug ? { category: { slug: categorySlug } } : {}),
+    ...(subcategorySlug ? { subcategory: { slug: subcategorySlug } } : {}),
+    ...searchCondition,
+  };
+
+  const [products, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+      ...productWithCategory,
+    }),
+    prisma.product.count({ where }),
+  ]);
+
+  return {
+    data: products,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
 }
 
 export async function getProductByIdAdmin(id: string) {
@@ -67,6 +160,7 @@ export async function createProduct(data: CreateProductInput): Promise<Product> 
       mainImage: data.mainImage,
       galleryImages: data.galleryImages ?? [],
       categoryId: data.categoryId,
+      subcategoryId: data.subcategoryId ?? null,
       stock: data.stock,
       isActive: data.isActive ?? true,
       ingredients: data.ingredients ?? null,
@@ -95,6 +189,7 @@ export async function updateProduct(
       ...(data.mainImage !== undefined && { mainImage: data.mainImage }),
       ...(data.galleryImages !== undefined && { galleryImages: data.galleryImages }),
       ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
+      ...(data.subcategoryId !== undefined && { subcategoryId: data.subcategoryId }),
       ...(data.stock !== undefined && { stock: data.stock }),
       ...(data.isActive !== undefined && { isActive: data.isActive }),
       ...(data.ingredients !== undefined && { ingredients: data.ingredients }),

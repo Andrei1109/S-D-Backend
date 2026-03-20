@@ -9,12 +9,19 @@
 
 import { type NextRequest } from "next/server";
 import { getAllOrders } from "@/services/orderService";
-import { successResponse, errorResponse, ERRORS } from "@/utils/apiResponse";
+import { paginatedResponse, errorResponse, ERRORS } from "@/utils/apiResponse";
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const orders = await getAllOrders();
-    return successResponse(orders);
+    const sp = request.nextUrl.searchParams;
+    const page = Math.max(1, Number(sp.get("page")) || 1);
+    const limit = Math.min(100, Math.max(1, Number(sp.get("limit")) || 20));
+    const search = sp.get("search") ?? undefined;
+    const status = sp.get("status") ?? undefined;
+    const payment = sp.get("payment") ?? undefined;
+
+    const result = await getAllOrders({ page, limit, search, status, payment });
+    return paginatedResponse(result.data, result.pagination);
   } catch (err) {
     console.error("[GET /api/admin/orders]", err);
     return errorResponse(ERRORS.INTERNAL, 500);
