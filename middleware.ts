@@ -24,7 +24,16 @@ function getSecret(): Uint8Array {
 }
 
 function corsHeaders(request: NextRequest): HeadersInit {
-  const origin = process.env.FRONTEND_URL ?? "*";
+  const allowedOrigins = (process.env.FRONTEND_URL ?? "*")
+    .split(",")
+    .map((o) => o.trim());
+
+  const requestOrigin = request.headers.get("origin") ?? "";
+  const origin =
+    allowedOrigins.includes("*") ? "*"
+    : allowedOrigins.includes(requestOrigin) ? requestOrigin
+    : allowedOrigins[0];
+
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
