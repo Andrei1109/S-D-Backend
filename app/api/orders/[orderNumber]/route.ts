@@ -36,6 +36,7 @@ export async function GET(
 
   return successResponse({
     orderNumber: order.orderNumber,
+    paymentMethod: order.paymentMethod,
     paymentStatus: order.paymentStatus,
     orderStatus: order.orderStatus,
     total: order.total,
