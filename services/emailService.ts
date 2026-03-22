@@ -69,8 +69,6 @@ function emailLayout(body: string): string {
               </p>
               <p style="margin:0 0 4px; font-size:13px; color:#6B5E50;">
                 <a href="tel:+40732468044" style="color:#A67B5B; text-decoration:none;">+40 732 468 044</a>
-                &nbsp;|&nbsp;
-                <a href="mailto:contact@danele.ro" style="color:#A67B5B; text-decoration:none;">contact@danele.ro</a>
               </p>
               <p style="margin:12px 0 0; font-size:11px; color:#B0A090;">
                 Program: Luni – Vineri, 12:00 – 20:00
