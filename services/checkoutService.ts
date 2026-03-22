@@ -71,12 +71,7 @@ export async function processCheckout(
         message: `Product "${product.name}" is no longer available.`,
       };
     }
-    if (product.stock < item.quantity) {
-      return {
-        type: "VALIDATION_ERROR",
-        message: `Insufficient stock for "${product.name}". Available: ${product.stock}.`,
-      };
-    }
+    // Stock validation removed — orders are accepted regardless of stock level.
   }
 
   // 3. Calculate totals (all arithmetic in JS Number is fine for display;
