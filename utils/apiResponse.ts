@@ -6,6 +6,7 @@
  * All API routes return one of these shapes:
  *   Success: { success: true,  data: <payload> }
  *   Error:   { success: false, error: "<message>" }
+ * ddd
  */
 
 import { NextResponse } from "next/server";
@@ -16,8 +17,13 @@ export function successResponse<T>(data: T, status = 200): NextResponse {
 
 export function paginatedResponse<T>(
   data: T[],
-  pagination: { page: number; limit: number; total: number; totalPages: number },
-  status = 200
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  },
+  status = 200,
 ): NextResponse {
   return NextResponse.json({ success: true, data, pagination }, { status });
 }
