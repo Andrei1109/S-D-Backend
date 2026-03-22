@@ -79,12 +79,10 @@ export async function initiateNetopiaPayment(
   });
 
   if (!order) {
-    console.error("[Netopia] Order not found:", orderId);
-    return null;
+    throw new Error(`DEBUG: Order not found for id=${orderId}`);
   }
   if (order.paymentStatus !== "pending") {
-    console.error("[Netopia] Order payment status is not pending:", order.paymentStatus, "for order:", orderId);
-    return null;
+    throw new Error(`DEBUG: Order ${orderId} paymentStatus=${order.paymentStatus}, expected pending`);
   }
 
   const posSignature = process.env.NETOPIA_POSID;
@@ -187,8 +185,7 @@ export async function initiateNetopiaPayment(
 
   if (!response.ok) {
     const text = await response.text();
-    console.error("[Netopia] Initiate failed:", response.status, text);
-    return null;
+    throw new Error(`DEBUG: Netopia API ${response.status}: ${text}`);
   }
 
   // TODO:NETOPIA — verify the exact response shape in the docs
@@ -198,8 +195,7 @@ export async function initiateNetopiaPayment(
 
   const paymentUrl = result?.payment?.paymentURL;
   if (!paymentUrl) {
-    console.error("[Netopia] No paymentURL in response:", result);
-    return null;
+    throw new Error(`DEBUG: No paymentURL in Netopia response: ${JSON.stringify(result)}`);
   }
 
   // Store ntpID on the pending transaction
