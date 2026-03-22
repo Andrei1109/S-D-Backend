@@ -21,6 +21,7 @@ export function paginatedResponse<T>(
     page: number;
     limit: number;
     total: number;
+
     totalPages: number;
   },
   status = 200,
