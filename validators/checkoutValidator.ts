@@ -28,7 +28,7 @@ export const checkoutSchema = z.object({
     .array(checkoutItemSchema)
     .min(1, "Order must contain at least one item.")
     .max(50, "Order cannot contain more than 50 distinct items."),
-  paymentMethod: z.enum(["NETOPIA"], {
+  paymentMethod: z.enum(["NETOPIA", "RAMBURS"], {
     errorMap: () => ({ message: "Unsupported payment method." }),
   }),
 });

@@ -33,6 +33,7 @@ enum PaymentStatus {
 
 enum PaymentMethod {
   NETOPIA
+  RAMBURS
 }
 
 enum TransactionStatus {
@@ -166,8 +167,8 @@ model OrderItem {
   orderId String
   order   Order  @relation(fields: [orderId], references: [id])
 
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   // Snapshots — preserve the historical record even if the product changes
   productNameSnapshot  String

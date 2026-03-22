@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
     const sp = request.nextUrl.searchParams;
     const page = Math.max(1, Number(sp.get("page")) || 1);
     const limit = Math.min(100, Math.max(1, Number(sp.get("limit")) || 20));
-    const search = sp.get("search") ?? undefined;
+    const rawSearch = sp.get("search") ?? undefined;
+    const search = rawSearch?.slice(0, 100) || undefined; // cap search length
     const categorySlug = sp.get("category") ?? undefined;
     const subcategorySlug = sp.get("subcategory") ?? undefined;
 

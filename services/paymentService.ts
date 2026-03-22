@@ -160,14 +160,23 @@ export async function initiateNetopiaPayment(
 
   // TODO:NETOPIA — confirm the exact Authorization header format with Netopia support.
   // Some docs show "Basic <base64>", others show a custom header.
-  const response = await fetch(NETOPIA_START_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: apiKey,      // TODO:NETOPIA — verify header name / format
-    },
-    body: JSON.stringify(requestBody),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10_000); // 10s timeout
+
+  let response: Response;
+  try {
+    response = await fetch(NETOPIA_START_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: apiKey,      // TODO:NETOPIA — verify header name / format
+      },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     const text = await response.text();
@@ -218,8 +227,8 @@ export async function handleNetopiaIpn(
   // Netopia may send a header you must validate to ensure the request is genuine.
   // Insert signature verification here before doing anything else.
 
-  // Log the full IPN payload for debugging
-  console.log("[Netopia IPN] Full payload:", JSON.stringify(rawPayload, null, 2));
+  // Log sanitised IPN metadata (no full payload — may contain sensitive card data)
+  console.log("[Netopia IPN] Received callback at", new Date().toISOString());
 
   // Netopia REST API v2 sends: { order: { orderID }, payment: { ntpID, status, ... } }
   const paymentData = rawPayload.payment ?? rawPayload;
@@ -227,6 +236,7 @@ export async function handleNetopiaIpn(
   const ntpID = (paymentData.ntpID ?? rawPayload.ntpID) as string | undefined;
   const orderID = (orderData.orderID ?? paymentData.orderID ?? rawPayload.orderID) as string | undefined;
   const status = Number(paymentData.status ?? rawPayload.status ?? 0);
+  const ipnAmount = Number(paymentData.amount ?? rawPayload.amount ?? 0);
 
   console.log("[Netopia IPN] Parsed → ntpID:", ntpID, "orderID:", orderID, "status:", status);
 
@@ -262,6 +272,17 @@ export async function handleNetopiaIpn(
       status: mapNetopiaStatus(status),
     },
   });
+
+  // ─── Amount validation: ensure IPN amount matches order total ───────
+  if (status === NETOPIA_STATUS.CONFIRMED && ipnAmount > 0) {
+    const orderTotal = Number(order.total);
+    if (Math.abs(ipnAmount - orderTotal) > 0.01) {
+      console.error(
+        `[Netopia IPN] Amount mismatch! Order ${order.orderNumber}: expected ${orderTotal} RON, IPN sent ${ipnAmount} RON`
+      );
+      return { httpStatus: 200, body: { errorCode: 3, errorMessage: "Amount mismatch" } };
+    }
+  }
 
   // Update order based on Netopia status
   switch (status) {

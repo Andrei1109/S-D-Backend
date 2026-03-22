@@ -22,6 +22,10 @@ const FREE_SHIPPING_THRESHOLD = parseFloat(
   process.env.FREE_SHIPPING_THRESHOLD_RON ?? "250"
 );
 
+// ─── Anti-fraud limits ──────────────────────────────────────────────────────
+const COD_MAX_TOTAL = 350;            // RON — above this, only card payment
+const MAX_ORDERS_PER_DAY = 3;         // per email or phone
+
 export interface CheckoutResult {
   orderId: string;
   orderNumber: string;
@@ -100,21 +104,52 @@ export async function processCheckout(
 
   const total = subtotal + shippingCost;
 
-  // 4. Generate order number (retry once on collision — rare but possible)
+  // 4. Anti-fraud: orders over COD_MAX_TOTAL RON must use card payment
+  if (total > COD_MAX_TOTAL && input.paymentMethod === "RAMBURS") {
+    return {
+      type: "VALIDATION_ERROR",
+      message: `Comenzile peste ${COD_MAX_TOTAL} RON pot fi plătite doar cu cardul online.`,
+    };
+  }
+
+  // 5. Anti-fraud: max MAX_ORDERS_PER_DAY orders per day per email or phone
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const ordersToday = await prisma.order.count({
+    where: {
+      createdAt: { gte: todayStart },
+      OR: [
+        { email: input.email.toLowerCase() },
+        { phone: input.phone },
+      ],
+    },
+  });
+
+  if (ordersToday >= MAX_ORDERS_PER_DAY) {
+    return {
+      type: "VALIDATION_ERROR",
+      message: `Ai atins limita de ${MAX_ORDERS_PER_DAY} comenzi pe zi. Revino mâine sau contactează-ne.`,
+    };
+  }
+
+  // 6. Generate order number (retry once on collision — rare but possible)
   let orderNumber = generateOrderNumber();
   const existing = await prisma.order.findUnique({ where: { orderNumber } });
   if (existing) {
     orderNumber = generateOrderNumber();
   }
 
-  // 5. Create Order + OrderItems + Transaction atomically
+  // 5. Create Order + OrderItems atomically.
+  //    Stock is decremented immediately only for RAMBURS (cash on delivery) orders.
+  //    For NETOPIA (online) orders, stock is decremented only upon IPN payment confirmation.
   const order = await prisma.$transaction(async (tx) => {
     const newOrder = await tx.order.create({
       data: {
         orderNumber,
         customerFirstName: input.customerFirstName,
         customerLastName: input.customerLastName,
-        email: input.email,
+        email: input.email.toLowerCase(),
         phone: input.phone,
         addressLine1: input.addressLine1,
         addressLine2: input.addressLine2 ?? null,
@@ -131,23 +166,31 @@ export async function processCheckout(
         items: {
           create: orderItemsData,
         },
-        transactions: {
-          create: {
-            provider: "NETOPIA",
-            amount: total,
-            currency: "RON",
-            status: "pending",
-          },
-        },
       },
     });
 
-    // Reserve stock for each item
-    for (const item of input.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: item.quantity } },
+    // For online payments, create a pending transaction record for the payment provider.
+    if (input.paymentMethod === "NETOPIA") {
+      await tx.transaction.create({
+        data: {
+          orderId: newOrder.id,
+          provider: "NETOPIA",
+          amount: total,
+          currency: "RON",
+          status: "pending",
+        },
       });
+    }
+
+    // For cash on delivery, decrement stock immediately (payment is guaranteed at delivery).
+    // For online payments, stock is decremented when the IPN confirms payment.
+    if (input.paymentMethod === "RAMBURS") {
+      for (const item of input.items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } },
+        });
+      }
     }
 
     return newOrder;

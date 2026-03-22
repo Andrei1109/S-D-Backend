@@ -34,7 +34,7 @@ export interface PaginatedResult<T> {
 const orderWithItems = {
   include: {
     items: {
-      include: { product: { select: { id: true, name: true, mainImage: true } } },
+      include: { product: { select: { id: true, name: true, slug: true, mainImage: true, price: true, stock: true, isActive: true } } },
     },
     transactions: {
       orderBy: { createdAt: "desc" as const },
@@ -136,9 +136,29 @@ export async function updateOrderStatus(
 // ─────────────────────────────────────────────
 
 export async function markOrderPaid(orderId: string) {
-  return prisma.order.update({
-    where: { id: orderId },
-    data: { paymentStatus: "paid", orderStatus: "paid" },
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+    if (!order) return null;
+
+    // For online payments (NETOPIA), stock was not decremented at order creation.
+    // Decrement it now that payment is confirmed.
+    if (order.paymentMethod === "NETOPIA") {
+      for (const item of order.items) {
+        if (!item.productId) continue; // product was deleted
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } },
+        });
+      }
+    }
+
+    return tx.order.update({
+      where: { id: orderId },
+      data: { paymentStatus: "paid", orderStatus: "paid" },
+    });
   });
 }
 
@@ -150,12 +170,16 @@ export async function markOrderPaymentFailed(orderId: string) {
     });
     if (!order || order.paymentStatus === "failed") return null; // idempotent
 
-    // Restore reserved stock
-    for (const item of order.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { stock: { increment: item.quantity } },
-      });
+    // Restore stock only for RAMBURS orders — NETOPIA stock was never decremented
+    // (it is only decremented upon IPN confirmation, which didn't happen here).
+    if (order.paymentMethod === "RAMBURS") {
+      for (const item of order.items) {
+        if (!item.productId) continue; // product was deleted
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } },
+        });
+      }
     }
 
     return tx.order.update({
@@ -173,12 +197,16 @@ export async function markOrderPaymentCancelled(orderId: string) {
     });
     if (!order || order.paymentStatus === "cancelled") return null; // idempotent
 
-    // Restore reserved stock
-    for (const item of order.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { stock: { increment: item.quantity } },
-      });
+    // Restore stock only for RAMBURS orders — NETOPIA stock was never decremented
+    // (it is only decremented upon IPN confirmation, which didn't happen here).
+    if (order.paymentMethod === "RAMBURS") {
+      for (const item of order.items) {
+        if (!item.productId) continue; // product was deleted
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } },
+        });
+      }
     }
 
     return tx.order.update({

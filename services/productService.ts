@@ -56,10 +56,21 @@ export async function getActiveProducts(
     })),
   } : {};
 
+  // Detect if value is an ID (CUID or UUID) vs. a slug
+  const isId = (v: string) => /^c[a-z0-9]{24}$/.test(v) || /^[0-9a-f-]{36}$/i.test(v);
+
   const where = {
     isActive: true,
-    ...(categorySlug ? { category: { slug: categorySlug } } : {}),
-    ...(subcategorySlug ? { subcategory: { slug: subcategorySlug } } : {}),
+    ...(categorySlug
+      ? isId(categorySlug)
+        ? { categoryId: categorySlug }
+        : { category: { slug: categorySlug } }
+      : {}),
+    ...(subcategorySlug
+      ? isId(subcategorySlug)
+        ? { subcategoryId: subcategorySlug }
+        : { subcategory: { slug: subcategorySlug } }
+      : {}),
     ...searchCondition,
   };
 
@@ -113,9 +124,20 @@ export async function getAllProductsAdmin(
     })),
   } : {};
 
+  // Detect if value is an ID (CUID or UUID) vs. a slug
+  const isId = (v: string) => /^c[a-z0-9]{24}$/.test(v) || /^[0-9a-f-]{36}$/i.test(v);
+
   const where = {
-    ...(categorySlug ? { category: { slug: categorySlug } } : {}),
-    ...(subcategorySlug ? { subcategory: { slug: subcategorySlug } } : {}),
+    ...(categorySlug
+      ? isId(categorySlug)
+        ? { categoryId: categorySlug }
+        : { category: { slug: categorySlug } }
+      : {}),
+    ...(subcategorySlug
+      ? isId(subcategorySlug)
+        ? { subcategoryId: subcategorySlug }
+        : { subcategory: { slug: subcategorySlug } }
+      : {}),
     ...searchCondition,
   };
 

@@ -17,6 +17,12 @@ import { supabase, STORAGE_BUCKET } from "@/lib/supabase";
 import { successResponse, errorResponse } from "@/utils/apiResponse";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const TYPE_TO_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 async function ensureBucketExists() {
@@ -51,8 +57,9 @@ export async function POST(request: NextRequest) {
   try {
     await ensureBucketExists();
 
-    const ext = file.name.split(".").pop() ?? "jpg";
-    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    // Use the validated content-type to determine extension (ignore user-supplied ext)
+    const ext = TYPE_TO_EXT[file.type] ?? "jpg";
+    const filename = `${Date.now()}-${crypto.randomUUID()}.${ext}`;
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = new Uint8Array(arrayBuffer);
@@ -103,6 +110,11 @@ export async function DELETE(request: NextRequest) {
     return errorResponse("Invalid storage URL.", 400);
   }
   const filename = url.slice(idx + marker.length);
+
+  // Prevent path traversal attacks
+  if (filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
+    return errorResponse("Invalid filename.", 400);
+  }
 
   try {
     const { error } = await supabase.storage.from(STORAGE_BUCKET).remove([filename]);
