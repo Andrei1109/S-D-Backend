@@ -78,8 +78,14 @@ export async function initiateNetopiaPayment(
     include: { items: true },
   });
 
-  if (!order) return null;
-  if (order.paymentStatus !== "pending") return null; // Prevent re-initiating a paid order
+  if (!order) {
+    console.error("[Netopia] Order not found:", orderId);
+    return null;
+  }
+  if (order.paymentStatus !== "pending") {
+    console.error("[Netopia] Order payment status is not pending:", order.paymentStatus, "for order:", orderId);
+    return null;
+  }
 
   const posSignature = process.env.NETOPIA_POSID;
   const apiKey = process.env.NETOPIA_API_KEY;

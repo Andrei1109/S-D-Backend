@@ -53,11 +53,8 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("[POST /api/payments/netopia/initiate]", err);
 
-    // Surface config errors clearly
-    if (err instanceof Error && err.message.includes("NETOPIA")) {
-      return errorResponse(err.message, 503);
-    }
-
-    return errorResponse(ERRORS.INTERNAL, 500);
+    // Surface ALL errors clearly so we can debug in production
+    const message = err instanceof Error ? err.message : String(err);
+    return errorResponse(`Payment initiation error: ${message}`, 503);
   }
 }
