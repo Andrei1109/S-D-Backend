@@ -95,8 +95,9 @@ export async function initiateNetopiaPayment(
   const baseReturnUrl = process.env.NETOPIA_RETURN_URL ?? "";
   const returnUrl = `${baseReturnUrl}${baseReturnUrl.includes("?") ? "&" : "?"}orderNumber=${order.orderNumber}`;
 
-  // Cancel URL → redirect to frontend homepage
-  const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:3001";
+  // Cancel URL → redirect to frontend homepage (pick the first https origin)
+  const frontendUrls = (process.env.FRONTEND_URL ?? "http://localhost:3001").split(",").map(u => u.trim());
+  const frontendUrl = frontendUrls.find(u => u.startsWith("https://")) ?? frontendUrls[0];
   const cancelUrl = process.env.NETOPIA_CANCEL_URL ?? frontendUrl;
 
   const requestBody = {
