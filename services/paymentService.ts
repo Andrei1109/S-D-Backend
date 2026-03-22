@@ -96,7 +96,7 @@ export async function initiateNetopiaPayment(
   }
 
   // Build redirect URLs with orderNumber so the return page knows which order to show
-  const baseReturnUrl = process.env.NETOPIA_RETURN_URL ?? "";
+  const baseReturnUrl = (process.env.NETOPIA_RETURN_URL ?? "").trim();
   const returnUrl = `${baseReturnUrl}${baseReturnUrl.includes("?") ? "&" : "?"}orderNumber=${order.orderNumber}`;
 
   // Cancel URL → redirect to frontend homepage (pick the first https origin)
