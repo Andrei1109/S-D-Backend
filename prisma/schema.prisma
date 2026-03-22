@@ -134,12 +134,21 @@ model Order {
   email             String
   phone             String
 
+  // Shipping address
   addressLine1 String
   addressLine2 String?
   city         String
   county       String
   postalCode   String?
   notes        String?
+
+  // Billing address
+  billingSameAsShipping Boolean @default(true)
+  billingAddressLine1   String?
+  billingAddressLine2   String?
+  billingCity           String?
+  billingCounty         String?
+  billingPostalCode     String?
 
   subtotal     Decimal @db.Decimal(10, 2)
   shippingCost Decimal @db.Decimal(10, 2)
