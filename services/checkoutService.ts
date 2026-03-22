@@ -15,6 +15,7 @@
 import { prisma } from "@/lib/prisma";
 import { getProductsByIds } from "@/services/productService";
 import { generateOrderNumber } from "@/utils/generateOrderNumber";
+import { sendOrderConfirmationEmail } from "@/services/emailService";
 import type { CheckoutInput } from "@/validators/checkoutValidator";
 
 const SHIPPING_COST = parseFloat(process.env.SHIPPING_COST_RON ?? "25");
@@ -196,6 +197,22 @@ export async function processCheckout(
 
     return newOrder;
   });
+
+  // Send order confirmation email for all orders
+  try {
+    await sendOrderConfirmationEmail(input.email.toLowerCase(), {
+      orderNumber: order.orderNumber,
+      customerFirstName: input.customerFirstName,
+      paymentMethod: input.paymentMethod,
+      items: orderItemsData,
+      subtotal,
+      shippingCost,
+      total,
+    });
+  } catch (emailErr) {
+    // Don't fail the order if email fails
+    console.error("[Checkout] Failed to send confirmation email:", emailErr);
+  }
 
   return {
     orderId: order.id,

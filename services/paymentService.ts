@@ -251,7 +251,7 @@ export async function handleNetopiaIpn(
   // Find the order by orderNumber (the value you sent as orderID)
   const order = await prisma.order.findUnique({
     where: { orderNumber: String(orderID) },
-    include: { transactions: true },
+    include: { transactions: true, items: true },
   });
 
   if (!order) {
@@ -292,7 +292,20 @@ export async function handleNetopiaIpn(
     case NETOPIA_STATUS.CONFIRMED:
       await markOrderPaid(order.id);
       await sendPaymentConfirmationEmail(order.email, order.orderNumber);
-      await sendOrderConfirmationEmail(order.email, order.orderNumber);
+      await sendOrderConfirmationEmail(order.email, {
+        orderNumber: order.orderNumber,
+        customerFirstName: order.customerFirstName,
+        paymentMethod: order.paymentMethod,
+        items: order.items.map(i => ({
+          productNameSnapshot: i.productNameSnapshot,
+          quantity: i.quantity,
+          productPriceSnapshot: Number(i.productPriceSnapshot),
+          lineTotal: Number(i.lineTotal),
+        })),
+        subtotal: Number(order.subtotal),
+        shippingCost: Number(order.shippingCost),
+        total: Number(order.total),
+      });
       break;
 
     case NETOPIA_STATUS.CANCELLED:

@@ -133,28 +133,86 @@ async function sendEmail(options: MailOptions): Promise<void> {
 /**
  * Order confirmation — sent right after checkout
  */
+export interface OrderEmailData {
+  orderNumber: string;
+  customerFirstName: string;
+  paymentMethod: string;
+  items: { productNameSnapshot: string; quantity: number; productPriceSnapshot: number | string; lineTotal: number | string }[];
+  subtotal: number | string;
+  shippingCost: number | string;
+  total: number | string;
+}
+
 export async function sendOrderConfirmationEmail(
   to: string,
-  orderNumber: string
+  order: OrderEmailData
 ): Promise<void> {
+  const itemsHtml = order.items.map((item) => `
+    <tr>
+      <td style="padding:8px 12px; border-bottom:1px solid #F0E6DC; color:#5C4A3A; font-size:14px;">
+        ${item.productNameSnapshot}
+      </td>
+      <td style="padding:8px 12px; border-bottom:1px solid #F0E6DC; color:#6B5E50; font-size:14px; text-align:center;">
+        ${item.quantity}
+      </td>
+      <td style="padding:8px 12px; border-bottom:1px solid #F0E6DC; color:#5C4A3A; font-size:14px; text-align:right; white-space:nowrap;">
+        ${Number(item.lineTotal).toFixed(2)} RON
+      </td>
+    </tr>
+  `).join("");
+
+  const paymentLabel = order.paymentMethod === "RAMBURS" ? "Ramburs (plata la livrare)" : "Card online";
+
   const body = `
     <h2 style="margin:0 0 16px; color:#5C4A3A; font-size:22px;">Comanda ta a fost primită!</h2>
     <p style="color:#6B5E50; font-size:15px; line-height:1.6;">
-      Mulțumim pentru comanda ta! Am primit-o și o procesăm în cel mai scurt timp.
+      Salut ${order.customerFirstName}, mulțumim pentru comanda ta! Am primit-o și o procesăm în cel mai scurt timp.
     </p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0; background-color:#FBF5EF; border-radius:12px; padding:20px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0; background-color:#FBF5EF; border-radius:12px;">
       <tr>
         <td style="padding:16px 20px;">
           <p style="margin:0 0 4px; font-size:13px; color:#A67B5B; text-transform:uppercase; letter-spacing:1px;">Număr comandă</p>
-          <p style="margin:0; font-size:22px; font-weight:700; color:#5C4A3A; letter-spacing:1px;">${orderNumber}</p>
+          <p style="margin:0; font-size:22px; font-weight:700; color:#5C4A3A; letter-spacing:1px;">${order.orderNumber}</p>
         </td>
       </tr>
     </table>
+
+    <h3 style="margin:24px 0 12px; color:#5C4A3A; font-size:16px;">Produse comandate</h3>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#FBF5EF; border-radius:12px; overflow:hidden;">
+      <thead>
+        <tr style="background-color:#E8D9C5;">
+          <th style="padding:10px 12px; text-align:left; color:#5C4A3A; font-size:13px; font-weight:600;">Produs</th>
+          <th style="padding:10px 12px; text-align:center; color:#5C4A3A; font-size:13px; font-weight:600;">Cant.</th>
+          <th style="padding:10px 12px; text-align:right; color:#5C4A3A; font-size:13px; font-weight:600;">Preț</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsHtml}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2" style="padding:8px 12px; color:#6B5E50; font-size:14px; text-align:right;">Subtotal:</td>
+          <td style="padding:8px 12px; color:#5C4A3A; font-size:14px; text-align:right; font-weight:600;">${Number(order.subtotal).toFixed(2)} RON</td>
+        </tr>
+        <tr>
+          <td colspan="2" style="padding:8px 12px; color:#6B5E50; font-size:14px; text-align:right;">Livrare:</td>
+          <td style="padding:8px 12px; color:#5C4A3A; font-size:14px; text-align:right;">${Number(order.shippingCost) === 0 ? "GRATUIT" : Number(order.shippingCost).toFixed(2) + " RON"}</td>
+        </tr>
+        <tr style="background-color:#E8D9C5;">
+          <td colspan="2" style="padding:12px; color:#5C4A3A; font-size:16px; text-align:right; font-weight:700;">Total:</td>
+          <td style="padding:12px; color:#5C4A3A; font-size:16px; text-align:right; font-weight:700;">${Number(order.total).toFixed(2)} RON</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <p style="margin:16px 0 0; color:#6B5E50; font-size:14px; line-height:1.6;">
+      <strong>Metodă de plată:</strong> ${paymentLabel}
+    </p>
     <p style="color:#6B5E50; font-size:14px; line-height:1.6;">
       Vei primi o notificare când comanda este expediată.
     </p>
     <p style="color:#6B5E50; font-size:14px; line-height:1.6;">
-      Dacă ai întrebări, nu ezita să ne contactezi.
+      Dacă ai întrebări, contactează-ne la <a href="tel:+40732468044" style="color:#C4956A;">+40 732 468 044</a>.
     </p>
     <p style="margin:24px 0 0; color:#A67B5B; font-size:14px;">
       Cu drag,<br/><strong>Echipa DANELE</strong>
@@ -163,7 +221,7 @@ export async function sendOrderConfirmationEmail(
 
   await sendEmail({
     to,
-    subject: `Comanda ${orderNumber} a fost primită — DANELE`,
+    subject: `Comanda ${order.orderNumber} a fost primită — DANELE`,
     html: emailLayout(body),
   });
 }
